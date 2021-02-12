@@ -2,50 +2,47 @@
 
 #include <string>
 
-#include "dbg.h"
 #include "root_file_comparator.h"
-
-using namespace std;
 
 bool debug_mode;
 
-static void get_ignored_classes(set<string> &ignored_classes,
+static void get_ignored_classes(std::set<std::string> &ignored_classes,
                                 char *ignored_classes_fn) {
-  ifstream classes_fn(ignored_classes_fn);
-  string curr_line;
+  std::ifstream classes_fn(ignored_classes_fn);
+  std::string curr_line;
   while (getline(classes_fn, curr_line)) {
     ignored_classes.insert(curr_line);
   }
 }
 
 static inline void usage() {
-  cout << endl;
-  cout << "Use: root_cmp [options] -- command-line-and-options" << endl;
-  cout << endl;
-  cout << "-c         Path to the user specified file, which records ignored "
+  std::cout << std::endl;
+  std::cout << "Use: root_cmp [options] -- command-line-and-options" << std::endl;
+  std::cout << std::endl;
+  std::cout << "-c         Path to the user specified file, which records ignored "
           "classes"
-       << endl;
-  cout << "-l         Enable log mode and write details to log (i.e. -l "
+       << std::endl;
+  std::cout << "-l         Enable log mode and write details to log (i.e. -l "
           "/path/to/logfile)"
-       << endl;
-  cout << "-m         Specify compare mode (i.e. CC, UC)." << endl;
-  cout << "-d         Enable debug mode." << endl;
-  cout << endl;
+       << std::endl;
+  std::cout << "-m         Specify compare mode (i.e. CC, UC)." << std::endl;
+  std::cout << "-d         Enable debug mode." << std::endl;
+  std::cout << std::endl;
 }
 
 int main(int argc, char *argv[]) {
   Agree_lv al = Not_eq;
   debug_mode = false;
   int opt = 0;
-  string compare_mode = "CC";
-  string cmp_mode_str = "COMPRESS COMPARE";
-  string agree_lv = "LOGICAL";
-  string log_fn = string("root_diff.log");
+  std::string compare_mode = "CC";
+  std::string cmp_mode_str = "COMPRESS COMPARE";
+  std::string agree_lv = "LOGICAL";
+  std::string log_fn = std::string("root_diff.log");
   char *fn1 = NULL, *fn2 = NULL;
   char *ignored_classes_fn = NULL;
 
   // Insert three types of class that will be ignored
-  set<string> ignored_classes;
+  std::set<std::string> ignored_classes;
   ignored_classes.insert("TFile");
   ignored_classes.insert("TTree");
   ignored_classes.insert("TDirectory");
@@ -53,7 +50,6 @@ int main(int argc, char *argv[]) {
   ignored_classes.insert("StreamerInfo");
   ignored_classes.insert("FreeSegments");
 
-  Rootfile_comparator rfc = Rootfile_comparator();
 
   extern char *optarg;
   extern int optind, opopt;
@@ -85,9 +81,11 @@ int main(int argc, char *argv[]) {
 
       default:
         usage();
-        goto error;
+        return 1;
     }
   }
+
+  Rootfile_comparator rfc = Rootfile_comparator(debug_mode);
 
   for (; optind < argc; optind++) {
     rc = access(argv[optind], R_OK);
@@ -101,15 +99,19 @@ int main(int argc, char *argv[]) {
     num_root_files++;
 
     if (rc != 0) {
-      log_err("%s is not accessible.", argv[optind]);
-      goto error;
+      std::cout << argv[optind] << " is not accessible." << std::endl;
+      if (fn1) delete[] fn1;
+      if (fn2) delete[] fn2;
+      return 1;
     }
   }
 
   // Check if there are two root files specified
   if (num_root_files != 2) {
-    log_err("Please specify two root files.");
-    goto error;
+    std::cout << "Please specifiy two root files." << std::endl;
+    if (fn1) delete[] fn1;
+    if (fn2) delete[] fn2;
+    return 1;
   }
 
   // Compare two root files
@@ -129,8 +131,10 @@ int main(int argc, char *argv[]) {
     case Not_eq:
       break;
     default:
-      log_err("Unknown Agreement Level");
-      goto error;
+      std::cout << "Unknown agreement level" << std::endl;
+      if (fn1) delete[] fn1;
+      if (fn2) delete[] fn2;
+      return 1;
   }
 
   if (!compare_mode.compare("UC")) {
@@ -140,21 +144,21 @@ int main(int argc, char *argv[]) {
   }
 
   // Output the comparison result
-  cout << "-----------------------------------------------------------" << endl;
-  cout << "file 1: " << fn1 << endl;
-  cout << "file 2: " << fn2 << endl;
-  cout << "The comparison mode is: " << cmp_mode_str << endl;
+  std::cout << "-----------------------------------------------------------" << std::endl;
+  std::cout << "file 1: " << fn1 << std::endl;
+  std::cout << "file 2: " << fn2 << std::endl;
+  std::cout << "The comparison mode is: " << cmp_mode_str << std::endl;
 
   if (al == Not_eq) {
-    cout << "file 1 is NOT EQUAL to file 2." << endl;
+    std::cout << "file 1 is NOT EQUAL to file 2." << std::endl;
   } else {
-    cout << "file 1 is EQUAL to file 2." << endl;
-    cout << "The agreement level is " << agree_lv << endl;
+    std::cout << "file 1 is EQUAL to file 2." << std::endl;
+    std::cout << "The agreement level is " << agree_lv << std::endl;
   }
   // if log file is specified
 
-  cout << "Details can be found in " << log_fn << endl;
-  cout << "-----------------------------------------------------------" << endl;
+  std::cout << "Details can be found in " << log_fn << std::endl;
+  std::cout << "-----------------------------------------------------------" << std::endl;
 
   if (fn1 != NULL) {
     delete[] fn1;
@@ -166,13 +170,4 @@ int main(int argc, char *argv[]) {
 
   return 0;
 
-error:
-  if (fn1 != NULL) {
-    delete[] fn1;
-  }
-
-  if (fn2 != NULL) {
-    delete[] fn2;
-  }
-  return 1;
 }

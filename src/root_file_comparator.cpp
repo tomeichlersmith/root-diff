@@ -1,13 +1,14 @@
 #include "root_file_comparator.h"
 
-using namespace std;
-
-/*
+/**
  * Get object information from the header (i.e. TKey)
+ *
+ * @param[in] header_array bytes in the header of the file
+ * @param[in] cur current index of header
+ * @param[in] f Pointer to open TFile
  */
-
 static Obj_info *get_obj_info(char *header_array, Long64_t cur,
-                              const TFile *f) {
+                              const TFile *f, bool debug) {
   UInt_t datime;
   Obj_info *obj_info = new Obj_info();
   char *header;
@@ -17,7 +18,8 @@ static Obj_info *get_obj_info(char *header_array, Long64_t cur,
   header = header_array;
   frombuf(header, &(obj_info->nbytes));
   if (!obj_info->nbytes) {
-    log_err("The size of the object buffer is unaccessible.");
+    std::cerr << "The size of the object buffer is unaccessible." << std::endl;
+    return nullptr;
   }
 
   Version_t version_key;
@@ -67,67 +69,60 @@ static Obj_info *get_obj_info(char *header_array, Long64_t cur,
   obj_info->date = 0;
   obj_info->time = 0;
 
-  if (debug_mode) {
-    debug("============%s obj info=============", obj_info->class_name);
-    debug("name: %s", obj_info->obj_name);
-    debug("class: %s", obj_info->class_name);
-    debug("seek_key: %ld", obj_info->seek_key);
-    debug("version: %d", version_key);
-    debug("nbytes: %d", obj_info->nbytes);
-    debug("object len: %d", obj_info->obj_len);
-    debug("datime: %d", datime);
-    debug("key len: %d", obj_info->key_len);
-    debug("# of cycles: %d", obj_info->cycle);
-    debug("====================================");
-    cout << endl;
+  if (debug) {
+    std::cout << "============ '" << obj_info->class_name << "' obj info=============" << std::endl;
+    std::cout << "name: " << obj_info->obj_name << std::endl;
+    std::cout << "class: " << obj_info->class_name << std::endl;
+    std::cout << "seek_key: " << obj_info->seek_key << std::endl;
+    std::cout << "version: " << version_key << std::endl;
+    std::cout << "nbytes: " << obj_info->nbytes << std::endl;
+    std::cout << "object len: " << obj_info->obj_len << std::endl;
+    std::cout << "datime: " << datime << std::endl;
+    std::cout << "key len: " << obj_info->key_len << std::endl;
+    std::cout << "# of cycles: " << obj_info->cycle << std::endl;
+    std::cout << "====================================" << std::endl;
+    std::cout << std::endl;
   }
 
   TDatime::GetDateTime(datime, obj_info->date, obj_info->time);
   return obj_info;
-
-error:
-  if (obj_info) {
-    delete obj_info;
-  }
-
-  exit(1);
 }
 
 Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
                                             const char *mode,
                                             const char *log_fn,
-                                            set<string> ignored_classes) {
+                                            std::set<std::string> ignored_classes) {
   Rootobj_comparator *roc;
   int num_obj_in_f1 = 0, num_obj_in_f2 = 0, num_logical_equal = 0,
       num_exact_equal = 0, num_strict_equal = 0;
 
   // Get comparison mode
   if (!strcmp(mode, "CC")) {
-    roc = new Cmprs_comparator();
+    roc = new Cmprs_comparator(debug_);
   } else if (!strcmp(mode, "UC")) {
-    roc = new Uncmprs_comparator();
+    roc = new Uncmprs_comparator(debug_);
   } else {
-    cout << "unknown option" << mode << endl;
+    std::cout << "unknown option" << mode << std::endl;
     exit(1);
   }
 
   // Check if input files are accessible
   if (access(fn_1, F_OK) == -1) {
-    cout << fn_1 << " does not exist." << endl;
+    std::cout << fn_1 << " does not exist." << std::endl;
     exit(1);
   }
 
   if (access(fn_2, F_OK) == -1) {
-    cout << fn_2 << " does not exist." << endl;
+    std::cout << fn_2 << " does not exist." << std::endl;
     exit(1);
   }
 
   bool logic_eq = true, strict_eq = true, exact_eq = true;
 
   // Create log file
-  ofstream log_f;
+  std::ofstream log_f;
   if (!log_f) {
-    cout << "cannot create log file" << endl;
+    std::cout << "cannot create log file" << std::endl;
   }
   log_f.open(log_fn);
 
@@ -148,9 +143,9 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
 
   Obj_info *obj_info_1;
 
-  string class_name_str_1;
+  std::string class_name_str_1;
 
-  vector<Obj_info *> objs_info;
+  std::vector<Obj_info *> objs_info;
 
   while (cur_1 < f1_end) {
     num_obj_in_f1++;
@@ -161,11 +156,12 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
     }
 
     if (f_1->ReadBuffer(header_1, nread_1)) {
-      log_err("Failed to read the object header from %s from disk at %ld", fn_1,
-              cur_1);
+      std::cerr << "Failed to read the object header from "
+        << fn_1 << "from disk at " << cur_1 << std::endl;
+      return Agree_lv::Not_eq;
     }
 
-    obj_info_1 = get_obj_info(header_1, cur_1, f_1);
+    obj_info_1 = get_obj_info(header_1, cur_1, f_1, debug_);
     obj_info_1->obj_index = num_obj_in_f1;
 
     if (obj_info_1->nbytes < 0) {
@@ -173,15 +169,14 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
       continue;
     }
 
-    class_name_str_1 = string(obj_info_1->class_name);
+    class_name_str_1 = std::string(obj_info_1->class_name);
 
-    if (debug_mode) {
-      set<string>::iterator it;
-      cout << "Ignored classes are: ";
-      for (it = ignored_classes.begin(); it != ignored_classes.end(); ++it) {
-        cout << *it << " ";
+    if (debug_) {
+      std::cout << "Ignored classes are: ";
+      for (auto const& c : ignored_classes) {
+        std::cout << c << " ";
       }
-      cout << endl;
+      std::cout << std::endl;
     }
 
     if (ignored_classes.find(class_name_str_1) == ignored_classes.end()) {
@@ -189,7 +184,7 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
     } else {
       log_f << class_name_str_1 << " in file 1 with index "
             << obj_info_1->obj_index << " and object name "
-            << obj_info_1->obj_name << " is ignored" << endl;
+            << obj_info_1->obj_name << " is ignored" << std::endl;
     }
 
     cur_1 += obj_info_1->nbytes;
@@ -211,9 +206,8 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
 
   Obj_info *obj_info_2;
 
-  string class_name_str_2;
-  vector<pair<Obj_info *, Obj_info *>> objs_pair;
-  vector<pair<Obj_info *, Obj_info *>>::iterator vctr_p_itr;
+  std::string class_name_str_2;
+  std::vector<std::pair<Obj_info *, Obj_info *>> objs_pair;
 
   while (cur_2 < f2_end) {
     num_obj_in_f2++;
@@ -224,11 +218,12 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
     }
 
     if (f_2->ReadBuffer(header_2, nread_2)) {
-      log_err("Failed to read the object header from %s from disk at %ld", fn_2,
-              cur_2);
+      std::cerr << "Failed to read the object header from "
+       << fn_2 << " from disk at " << cur_2 << std::endl;
+      return Agree_lv::Not_eq;
     }
 
-    obj_info_2 = get_obj_info(header_2, cur_2, f_2);
+    obj_info_2 = get_obj_info(header_2, cur_2, f_2, debug_);
     obj_info_2->obj_index = num_obj_in_f2;
 
     if (obj_info_2->nbytes < 0) {
@@ -236,59 +231,53 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
       continue;
     }
 
-    class_name_str_2 = string(obj_info_2->class_name);
+    class_name_str_2 = std::string(obj_info_2->class_name);
 
-    if (debug_mode) {
-      set<string>::iterator it;
-      cout << "Ignored classes are: ";
-      for (it = ignored_classes.begin(); it != ignored_classes.end(); ++it) {
-        cout << *it << " ";
+    if (debug_) {
+      std::cout << "Ignored classes are: ";
+      for (auto const& c : ignored_classes) {
+        std::cout << c << " ";
       }
-      cout << endl;
+      std::cout << std::endl;
     }
 
     if (ignored_classes.find(class_name_str_2) == ignored_classes.end()) {
       // If current class is not in the ignored classes list
-      vector<Obj_info *>::iterator vctr_itr;
-      bool find_match = false;
-      for (vctr_itr = objs_info.begin(); vctr_itr != objs_info.end();
-           ++vctr_itr) {
-        if (roc->logic_cmp((*vctr_itr), obj_info_2)) {
+      bool found_match{false};
+      for (auto info_it = objs_info.begin(); info_it != objs_info.end(); ++info_it) {
+        Obj_info* info = *info_it;
+        if (roc->logic_cmp(info, obj_info_2)) {
           num_logical_equal++;
-          pair<Obj_info *, Obj_info *> obj_pair((*vctr_itr), obj_info_2);
+          std::pair<Obj_info *, Obj_info *> obj_pair(info, obj_info_2);
           // every obj_info can only be used once
-          log_f << (*vctr_itr)->class_name << " with index "
-                << (*vctr_itr)->obj_index << " with object name "
-                << (*vctr_itr)->obj_name << " in file 1 is structual-equal to "
+          log_f << info->class_name << " with index "
+                << info->obj_index << " with object name "
+                << info->obj_name << " in file 1 is structual-equal to "
                 << obj_info_2->class_name << " with index "
                 << obj_info_2->obj_index << " and object name "
-                << obj_info_2->obj_name << " in file 2 " << endl;
+                << obj_info_2->obj_name << " in file 2 " << std::endl;
 
-          vctr_itr = objs_info.erase(vctr_itr);
+          objs_info.erase(info_it);
           objs_pair.push_back(obj_pair);
-
-          find_match = true;
+          found_match = true;
           break;
-        }
-      }
+        } //found logical match
+      } //loop over object info
 
-      if (!find_match) {
+      if (not found_match) {
         // does not found matched object in file 1
         log_f << "Cannot find matched object for the instance of "
               << obj_info_2->class_name << " in file 2 with index "
-              << obj_info_2->obj_index << " with size " << (*vctr_itr)->nbytes
-              << ", cycle number " << (*vctr_itr)->cycle << " and object name "
-              << (*vctr_itr)->obj_name << endl;
+              << obj_info_2->obj_index << std::endl;
 
         logic_eq = false;
         strict_eq = false;
         exact_eq = false;
-        // goto end;
       }
     } else {
       log_f << class_name_str_2 << " in file 2 with index "
             << obj_info_2->obj_index << " and object name "
-            << obj_info_1->obj_name << " is ignored" << endl;
+            << obj_info_1->obj_name << " is ignored" << std::endl;
     }
 
     cur_2 += obj_info_2->nbytes;
@@ -298,15 +287,13 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
   // 1, file 1 is not logically equal to file 2
 
   if (!objs_info.empty()) {
-    vector<Obj_info *>::iterator vctr_itr;
-    for (vctr_itr = objs_info.begin(); vctr_itr != objs_info.end();
-         ++vctr_itr) {
+    for (auto const& info : objs_info) {
       log_f << "Cannot find matched object for the instance of "
-            << (*vctr_itr)->class_name << " in file 1 with index "
-            << (*vctr_itr)->obj_index << " with size " << (*vctr_itr)->nbytes
-            << ", cycle number " << (*vctr_itr)->cycle << " and object name "
-            << (*vctr_itr)->obj_name << endl;
-      delete (*vctr_itr);
+            << info->class_name << " in file 1 with index "
+            << info->obj_index << " with size " << info->nbytes
+            << ", cycle number " << info->cycle << " and object name "
+            << info->obj_name << std::endl;
+      delete info;
     }
     logic_eq = false;
     strict_eq = false;
@@ -318,28 +305,27 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
   // strictly/exactly agreed. If every entry is strictly/exactly agreed,
   // we say that file 1 is strictly/exactly equal to file 2.
 
-  for (vctr_p_itr = objs_pair.begin(); vctr_p_itr != objs_pair.end();
-       ++vctr_p_itr) {
-    if (!roc->strict_cmp((*vctr_p_itr).first, f_1, (*vctr_p_itr).second, f_2)) {
-      log_f << (*vctr_p_itr).first->class_name << " in file 1 with index "
-            << (*vctr_p_itr).first->obj_index << " and object name "
-            << (*vctr_p_itr).first->obj_name << " is NOT CONTENT-EQUAL to "
-            << (*vctr_p_itr).second->class_name << " in file 2 with index "
-            << (*vctr_p_itr).second->obj_index << " and object name "
-            << (*vctr_p_itr).second->obj_name << endl;
+  for (auto const [first, second] : objs_pair) {
+    if (!roc->strict_cmp(first, f_1, second, f_2)) {
+      log_f << first->class_name << " in file 1 with index "
+            << first->obj_index << " and object name "
+            << first->obj_name << " is NOT CONTENT-EQUAL to "
+            << second->class_name << " in file 2 with index "
+            << second->obj_index << " and object name "
+            << second->obj_name << std::endl;
 
       strict_eq = false;
       exact_eq = false;
 
     } else {
       num_strict_equal++;
-      if (!roc->exact_cmp((*vctr_p_itr).first, (*vctr_p_itr).second)) {
-        log_f << (*vctr_p_itr).first->class_name << " in file 1 with index "
-              << (*vctr_p_itr).first->obj_index << " and object name "
-              << (*vctr_p_itr).first->obj_name << " is NOT BITWISE-EQUAL to "
-              << (*vctr_p_itr).second->class_name << " in file 2 with index "
-              << (*vctr_p_itr).second->obj_index << " and object name "
-              << (*vctr_p_itr).second->obj_name << endl;
+      if (!roc->exact_cmp(first, second)) {
+        log_f << first->class_name << " in file 1 with index "
+              << first->obj_index << " and object name "
+              << first->obj_name << " is NOT BITWISE-EQUAL to "
+              << second->class_name << " in file 2 with index "
+              << second->obj_index << " and object name "
+              << second->obj_name << std::endl;
 
         exact_eq = false;
       } else {
@@ -352,24 +338,22 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
     delete roc;
   }
 
-end:
-  for (vctr_p_itr = objs_pair.begin(); vctr_p_itr != objs_pair.end();
-       ++vctr_p_itr) {
-    delete (*vctr_p_itr).first;
-    delete (*vctr_p_itr).second;
+  for (auto const& [first, second] : objs_pair) {
+    delete first;
+    delete second;
   }
 
   tmr.reset();
   t = tmr.elapsed();
-  log_f << endl;
-  log_f << "================= Comparison summary =================" << endl;
-  log_f << "Time elapsed: " << t << endl;
+  log_f << std::endl;
+  log_f << "================= Comparison summary =================" << std::endl;
+  log_f << "Time elapsed: " << t << std::endl;
 
-  log_f << "Number of objects in file 1 is: " << num_obj_in_f1 << endl;
-  log_f << "Number of objects in file 2 is: " << num_obj_in_f2 << endl;
-  log_f << "Number of structural equivalent: " << num_logical_equal << endl;
-  log_f << "Number of content equivalent: " << num_strict_equal << endl;
-  log_f << "Number of bitwise equivalent: " << num_exact_equal << endl;
+  log_f << "Number of objects in file 1 is: " << num_obj_in_f1 << std::endl;
+  log_f << "Number of objects in file 2 is: " << num_obj_in_f2 << std::endl;
+  log_f << "Number of structural equivalent: " << num_logical_equal << std::endl;
+  log_f << "Number of content equivalent: " << num_strict_equal << std::endl;
+  log_f << "Number of bitwise equivalent: " << num_exact_equal << std::endl;
 
   log_f.close();
 
@@ -382,7 +366,4 @@ end:
   } else {
     return Not_eq;
   }
-
-error:
-  exit(1);
 }

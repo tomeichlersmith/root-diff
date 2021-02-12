@@ -1,10 +1,6 @@
 #include "root_obj_comparator.h"
 
-#include "dbg.h"
-
 #define ROOT_DIR "TDirectoryFile"
-
-using namespace std;
 
 /*
 
@@ -12,10 +8,6 @@ header = header_array; * Uncompress the object buffer exclude the key buffer
  */
 
 static unsigned char *buffer_uncomprs(Obj_info *obj_info, TFile *f) {
-  if (debug_mode) {
-    debug("unzip the buffer");
-  }
-
   int obj_len = obj_info->obj_len, key_len = obj_info->key_len,
       nsize = obj_info->nbytes, comprs_len = nsize - key_len;
 
@@ -100,11 +92,13 @@ bool Rootobj_comparator::exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) {
 
 bool Cmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f_1,
                                   Obj_info *obj_info_2, TFile *f_2) {
-  if (debug_mode) {
-    debug(
-        "Compare the compressed buffer of %s object in file 1 and %s object in "
-        "file 2",
-        obj_info_1->class_name, obj_info_2->class_name);
+  if (debug_) {
+    std::cout << 
+        "Compare the compressed buffer of '"
+        << obj_info_1->class_name
+        << "' object in file 1 and '"
+        << obj_info_2->class_name
+        << "' object in file 2" << std::endl;
   }
 
   // Since TDirectoryFile class has fUUID attribute,
@@ -144,11 +138,13 @@ bool Cmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f_1,
 
 bool Uncmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f1,
                                     Obj_info *obj_info_2, TFile *f2) {
-  if (debug_mode) {
-    debug(
-        "Compare the uncompressed buffer of %s object in file 1 and %s object "
-        "file 2",
-        obj_info_1->class_name, obj_info_2->class_name);
+  if (debug_) {
+    std::cout << 
+        "Compare the uncompressed buffer of '"
+        << obj_info_1->class_name
+        << "' object in file 1 and '"
+        << obj_info_2->class_name
+        << "' object in file 2" << std::endl;
   }
 
   if (strcmp(obj_info_1->class_name, ROOT_DIR) == 0) {
@@ -158,8 +154,11 @@ bool Uncmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f1,
     return true;
   }
 
-  unsigned char *uncomprs_buf_1 = buffer_uncomprs(obj_info_1, f1),
-                *uncomprs_buf_2 = buffer_uncomprs(obj_info_2, f2);
+  if (debug_) { std::cout << "unzip the buffer" << std::endl; }
+  unsigned char *uncomprs_buf_1 = buffer_uncomprs(obj_info_1, f1);
+  
+  if (debug_) { std::cout << "unzip the buffer" << std::endl; }
+  unsigned char *uncomprs_buf_2 = buffer_uncomprs(obj_info_2, f2);
 
   int obj_len = obj_info_1->obj_len;
 
