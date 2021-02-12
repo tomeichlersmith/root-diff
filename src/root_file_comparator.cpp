@@ -1,5 +1,7 @@
 #include "root_file_comparator.h"
 
+namespace rootdiff {
+
 /**
  * Get object information from the header (i.e. TKey)
  *
@@ -88,23 +90,15 @@ static Obj_info *get_obj_info(char *header_array, Long64_t cur,
   return obj_info;
 }
 
-Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
-                                            const char *mode,
-                                            const char *log_fn,
-                                            std::set<std::string> ignored_classes) {
-  Rootobj_comparator *roc;
+AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
+                              const char *mode,
+                              const char *log_fn,
+                              std::set<std::string> ignored_classes) const {
   int num_obj_in_f1 = 0, num_obj_in_f2 = 0, num_logical_equal = 0,
       num_exact_equal = 0, num_strict_equal = 0;
 
   // Get comparison mode
-  if (!strcmp(mode, "CC")) {
-    roc = new Cmprs_comparator(debug_);
-  } else if (!strcmp(mode, "UC")) {
-    roc = new Uncmprs_comparator(debug_);
-  } else {
-    std::cout << "unknown option" << mode << std::endl;
-    exit(1);
-  }
+  ObjectComparer obj_comp(debug_, !strcmp(mode,"CC"));
 
   // Check if input files are accessible
   if (access(fn_1, F_OK) == -1) {
@@ -158,7 +152,7 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
     if (f_1->ReadBuffer(header_1, nread_1)) {
       std::cerr << "Failed to read the object header from "
         << fn_1 << "from disk at " << cur_1 << std::endl;
-      return Agree_lv::Not_eq;
+      return AgreeLevel::Not_eq;
     }
 
     obj_info_1 = get_obj_info(header_1, cur_1, f_1, debug_);
@@ -220,7 +214,7 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
     if (f_2->ReadBuffer(header_2, nread_2)) {
       std::cerr << "Failed to read the object header from "
        << fn_2 << " from disk at " << cur_2 << std::endl;
-      return Agree_lv::Not_eq;
+      return AgreeLevel::Not_eq;
     }
 
     obj_info_2 = get_obj_info(header_2, cur_2, f_2, debug_);
@@ -246,7 +240,7 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
       bool found_match{false};
       for (auto info_it = objs_info.begin(); info_it != objs_info.end(); ++info_it) {
         Obj_info* info = *info_it;
-        if (roc->logic_cmp(info, obj_info_2)) {
+        if (obj_comp.logic_cmp(info, obj_info_2)) {
           num_logical_equal++;
           std::pair<Obj_info *, Obj_info *> obj_pair(info, obj_info_2);
           // every obj_info can only be used once
@@ -306,7 +300,7 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
   // we say that file 1 is strictly/exactly equal to file 2.
 
   for (auto const [first, second] : objs_pair) {
-    if (!roc->strict_cmp(first, f_1, second, f_2)) {
+    if (!obj_comp.strict_cmp(first, f_1, second, f_2)) {
       log_f << first->class_name << " in file 1 with index "
             << first->obj_index << " and object name "
             << first->obj_name << " is NOT CONTENT-EQUAL to "
@@ -319,7 +313,7 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
 
     } else {
       num_strict_equal++;
-      if (!roc->exact_cmp(first, second)) {
+      if (!obj_comp.exact_cmp(first, second)) {
         log_f << first->class_name << " in file 1 with index "
               << first->obj_index << " and object name "
               << first->obj_name << " is NOT BITWISE-EQUAL to "
@@ -332,10 +326,6 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
         num_exact_equal++;
       }
     }
-  }
-
-  if (!roc) {
-    delete roc;
   }
 
   for (auto const& [first, second] : objs_pair) {
@@ -358,12 +348,14 @@ Agree_lv Rootfile_comparator::root_file_cmp(char *fn_1, char *fn_2,
   log_f.close();
 
   if (exact_eq) {
-    return Exact_eq;
+    return AgreeLevel::Exact_eq;
   } else if (strict_eq) {
-    return Strict_eq;
+    return AgreeLevel::Strict_eq;
   } else if (logic_eq) {
-    return Logic_eq;
+    return AgreeLevel::Logic_eq;
   } else {
-    return Not_eq;
+    return AgreeLevel::Not_eq;
   }
 }
+
+}  // namespace rootdiff

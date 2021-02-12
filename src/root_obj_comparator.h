@@ -13,6 +13,8 @@
 
 #define NAME_LEN 512
 
+namespace rootdiff {
+
 /*
  * Struct storing the object information
  */
@@ -28,32 +30,24 @@ typedef struct Obj_info {
 
 } Obj_info;
 
-// Base class
-class Rootobj_comparator {
+class ObjectComparer {
  public:
-  Rootobj_comparator(bool debug) : debug_(debug) {}
-  bool logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2);
-  bool exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2);
-  virtual bool strict_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2,
-                          TFile *f2) = 0;
- protected :
+  ObjectComparer(bool debug, bool comp_compressed) : 
+    debug_(debug), compare_compressed_(comp_compressed) {}
+  bool logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const;
+  bool exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const;
+  bool strict_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2, TFile *f2) const {
+    if (compare_compressed_) { return compressed_cmp(obj_info_1,f1,obj_info_2,f2); }
+    else                     { return uncompressed_cmp(obj_info_1,f1,obj_info_2,f2); }
+  }
+ private:
+  bool compressed_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2, TFile *f2) const;
+  bool uncompressed_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2, TFile *f2) const;
+ private:
+  bool compare_compressed_;
   bool debug_;
 };
 
-// Compressed comparator
-class Cmprs_comparator : public Rootobj_comparator {
- public:
-  Cmprs_comparator(bool d) : Rootobj_comparator(d) {}
-  bool strict_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2,
-                  TFile *f2);
-};
-
-// Uncompressed comparator
-class Uncmprs_comparator : public Rootobj_comparator {
- public:
-  Uncmprs_comparator(bool d) : Rootobj_comparator(d) {}
-  bool strict_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2,
-                  TFile *f2);
-};
+}  // namespace rootdiff
 
 #endif

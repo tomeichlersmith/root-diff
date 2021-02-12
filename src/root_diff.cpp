@@ -4,8 +4,6 @@
 
 #include "root_file_comparator.h"
 
-bool debug_mode;
-
 static void get_ignored_classes(std::set<std::string> &ignored_classes,
                                 char *ignored_classes_fn) {
   std::ifstream classes_fn(ignored_classes_fn);
@@ -31,8 +29,8 @@ static inline void usage() {
 }
 
 int main(int argc, char *argv[]) {
-  Agree_lv al = Not_eq;
-  debug_mode = false;
+  rootdiff::AgreeLevel al = rootdiff::AgreeLevel::Not_eq;
+  bool debug_mode = false;
   int opt = 0;
   std::string compare_mode = "CC";
   std::string cmp_mode_str = "COMPRESS COMPARE";
@@ -49,7 +47,6 @@ int main(int argc, char *argv[]) {
   ignored_classes.insert("KeysList");
   ignored_classes.insert("StreamerInfo");
   ignored_classes.insert("FreeSegments");
-
 
   extern char *optarg;
   extern int optind, opopt;
@@ -85,7 +82,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  Rootfile_comparator rfc = Rootfile_comparator(debug_mode);
+  rootdiff::FileComparer comparer(debug_mode);
 
   for (; optind < argc; optind++) {
     rc = access(argv[optind], R_OK);
@@ -115,20 +112,20 @@ int main(int argc, char *argv[]) {
   }
 
   // Compare two root files
-  al = rfc.root_file_cmp(fn1, fn2, compare_mode.c_str(), log_fn.c_str(),
-                         ignored_classes);
+  al = comparer.comp(fn1, fn2, compare_mode.c_str(), log_fn.c_str(),
+                     ignored_classes);
 
   // Check the agreement level
   switch (al) {
-    case Logic_eq:
+    case rootdiff::AgreeLevel::Logic_eq:
       break;
-    case Strict_eq:
+    case rootdiff::AgreeLevel::Strict_eq:
       agree_lv = "STRICT";
       break;
-    case Exact_eq:
+    case rootdiff::AgreeLevel::Exact_eq:
       agree_lv = "EXACT";
       break;
-    case Not_eq:
+    case rootdiff::AgreeLevel::Not_eq:
       break;
     default:
       std::cout << "Unknown agreement level" << std::endl;
@@ -149,7 +146,7 @@ int main(int argc, char *argv[]) {
   std::cout << "file 2: " << fn2 << std::endl;
   std::cout << "The comparison mode is: " << cmp_mode_str << std::endl;
 
-  if (al == Not_eq) {
+  if (al == rootdiff::AgreeLevel::Not_eq) {
     std::cout << "file 1 is NOT EQUAL to file 2." << std::endl;
   } else {
     std::cout << "file 1 is EQUAL to file 2." << std::endl;

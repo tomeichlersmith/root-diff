@@ -7,6 +7,8 @@
 header = header_array; * Uncompress the object buffer exclude the key buffer
  */
 
+namespace rootdiff {
+
 static unsigned char *buffer_uncomprs(Obj_info *obj_info, TFile *f) {
   int obj_len = obj_info->obj_len, key_len = obj_info->key_len,
       nsize = obj_info->nbytes, comprs_len = nsize - key_len;
@@ -57,7 +59,7 @@ static unsigned char *buffer_uncomprs(Obj_info *obj_info, TFile *f) {
  * object name, then they are logically equal to each other.
  */
 
-bool Rootobj_comparator::logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) {
+bool ObjectComparer::logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const {
   if ((obj_info_1->nbytes) != (obj_info_2->nbytes)) {
     return false;
   }
@@ -78,7 +80,7 @@ bool Rootobj_comparator::logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) {
  * they are exactlly equal if they have same timestamp.
  */
 
-bool Rootobj_comparator::exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) {
+bool ObjectComparer::exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const {
   if (obj_info_1->date != obj_info_2->date) {
     return false;
   }
@@ -90,8 +92,7 @@ bool Rootobj_comparator::exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) {
   return true;
 }
 
-bool Cmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f_1,
-                                  Obj_info *obj_info_2, TFile *f_2) {
+bool ObjectComparer::compressed_cmp(Obj_info *obj_info_1, TFile *f_1, Obj_info *obj_info_2, TFile *f_2) const {
   if (debug_) {
     std::cout << 
         "Compare the compressed buffer of '"
@@ -136,8 +137,7 @@ bool Cmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f_1,
   return (rc == 0 ? true : false);
 }
 
-bool Uncmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f1,
-                                    Obj_info *obj_info_2, TFile *f2) {
+bool ObjectComparer::uncompressed_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2, TFile *f2) const {
   if (debug_) {
     std::cout << 
         "Compare the uncompressed buffer of '"
@@ -169,3 +169,5 @@ bool Uncmprs_comparator::strict_cmp(Obj_info *obj_info_1, TFile *f1,
 
   return (rc == 0 ? true : false);
 }
+
+}  // namespace rootdiff
