@@ -27,7 +27,7 @@ std::string get_next(char *header) {
  * @param[in] f Pointer to open TFile
  */
 static ObjectInfo get_obj_info(char *header_array, Long64_t cur,
-                               const TFile *f, bool debug) {
+                               const TFile &f, bool debug) {
   UInt_t datime;
   ObjectInfo obj_info;
   char *header;
@@ -63,13 +63,13 @@ static ObjectInfo get_obj_info(char *header_array, Long64_t cur,
   // Get the class name of object
   obj_info.class_name = get_next(header);
 
-  if (cur == f->GetSeekFree()) {
+  if (cur == f.GetSeekFree()) {
     obj_info.class_name = "FreeSegments";
   }
-  if (cur == f->GetSeekInfo()) {
+  if (cur == f.GetSeekInfo()) {
     obj_info.class_name = "StreamerInfo";
   }
-  if (cur == f->GetSeekKeys()) {
+  if (cur == f.GetSeekKeys()) {
     obj_info.class_name = "KeysList";
   }
 
@@ -97,25 +97,33 @@ static ObjectInfo get_obj_info(char *header_array, Long64_t cur,
   return std::move(obj_info);
 }
 
-AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
-                              const char *mode,
-                              const char *log_fn,
+AgreeLevel FileComparer::comp(const std::string &fn_1, 
+                              const std::string &fn_2,
+                              const std::string &mode,
+                              const std::string &log_fn,
                               std::set<std::string> ignored_classes) const {
   int num_obj_in_f1 = 0, num_obj_in_f2 = 0, num_logical_equal = 0,
       num_exact_equal = 0, num_strict_equal = 0;
 
   // Get comparison mode
-  ObjectComparer obj_comp(debug_, !strcmp(mode,"CC"));
+  bool compressed{false};
+  if (mode == "CC") {
+    compressed = true;
+  } else if (mode != "UC") {
+    std::cerr << "Unrecognized comparison mode '" << mode << "'" << std::endl;
+    throw std::exception();
+  }
+  ObjectComparer obj_comp(debug_, compressed);
 
   // Check if input files are accessible
-  if (access(fn_1, F_OK) == -1) {
+  if (access(fn_1.c_str(), F_OK) == -1) {
     std::cout << fn_1 << " does not exist." << std::endl;
-    exit(1);
+    throw std::exception();
   }
 
-  if (access(fn_2, F_OK) == -1) {
+  if (access(fn_2.c_str(), F_OK) == -1) {
     std::cout << fn_2 << " does not exist." << std::endl;
-    exit(1);
+    throw std::exception();
   }
 
   bool logic_eq = true, strict_eq = true, exact_eq = true;
@@ -132,31 +140,29 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
 
   // Scan file 1 and generate object information array
 
-  TFile *f_1 = new TFile(fn_1);
+  TFile f_1(fn_1.c_str());
 
   Int_t nwheader;
   nwheader = 64;
   Int_t nread_1 = nwheader;
 
-  Long64_t cur_1 = HEADER_LEN, f1_end = f_1->GetEND();
+  Long64_t cur_1 = HEADER_LEN, f1_end = f_1.GetEND();
 
   char header_1[HEADER_LEN];
 
   ObjectInfo obj_info_1;
 
-  std::string class_name_str_1;
-
-  std::vector<ObjectInfo > objs_info;
+  std::vector<ObjectInfo> objs_info;
 
   while (cur_1 < f1_end) {
     num_obj_in_f1++;
-    f_1->Seek(cur_1);
+    f_1.Seek(cur_1);
 
     if (cur_1 + nread_1 >= f1_end) {
       nread_1 = f1_end - cur_1 - 1;
     }
 
-    if (f_1->ReadBuffer(header_1, nread_1)) {
+    if (f_1.ReadBuffer(header_1, nread_1)) {
       std::cerr << "Failed to read the object header from "
         << fn_1 << "from disk at " << cur_1 << std::endl;
       return AgreeLevel::Not_eq;
@@ -170,8 +176,6 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
       continue;
     }
 
-    class_name_str_1 = std::string(obj_info_1.class_name);
-
     if (debug_) {
       std::cout << "Ignored classes are: ";
       for (auto const& c : ignored_classes) {
@@ -180,10 +184,10 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
       std::cout << std::endl;
     }
 
-    if (ignored_classes.find(class_name_str_1) == ignored_classes.end()) {
+    if (ignored_classes.find(obj_info_1.class_name) == ignored_classes.end()) {
       objs_info.push_back(obj_info_1);
     } else {
-      log_f << class_name_str_1 << " in file 1 with index "
+      log_f << obj_info_1.class_name << " in file 1 with index "
             << obj_info_1.obj_index << " and object name "
             << obj_info_1.obj_name << " is ignored" << std::endl;
     }
@@ -197,28 +201,27 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
   // If there exists an object in file 2 which does not has matched
   // object in file 1, we say file 1 is not equal to file 2
 
-  TFile *f_2 = new TFile(fn_2);
+  TFile f_2(fn_2.c_str());
 
   Int_t nread_2 = nwheader;
 
-  Long64_t cur_2 = HEADER_LEN, f2_end = f_2->GetEND();
+  Long64_t cur_2 = HEADER_LEN, f2_end = f_2.GetEND();
 
   char header_2[HEADER_LEN];
 
   ObjectInfo obj_info_2;
 
-  std::string class_name_str_2;
   std::vector<std::pair<ObjectInfo , ObjectInfo >> objs_pair;
 
   while (cur_2 < f2_end) {
     num_obj_in_f2++;
-    f_2->Seek(cur_2);
+    f_2.Seek(cur_2);
 
     if (cur_2 + nread_2 >= f2_end) {
       nread_2 = f2_end - cur_2 - 1;
     }
 
-    if (f_2->ReadBuffer(header_2, nread_2)) {
+    if (f_2.ReadBuffer(header_2, nread_2)) {
       std::cerr << "Failed to read the object header from "
        << fn_2 << " from disk at " << cur_2 << std::endl;
       return AgreeLevel::Not_eq;
@@ -232,8 +235,6 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
       continue;
     }
 
-    class_name_str_2 = std::string(obj_info_2.class_name);
-
     if (debug_) {
       std::cout << "Ignored classes are: ";
       for (auto const& c : ignored_classes) {
@@ -242,7 +243,7 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
       std::cout << std::endl;
     }
 
-    if (ignored_classes.find(class_name_str_2) == ignored_classes.end()) {
+    if (ignored_classes.find(obj_info_2.class_name) == ignored_classes.end()) {
       // If current class is not in the ignored classes list
       bool found_match{false};
       for (auto info_it = objs_info.begin(); info_it != objs_info.end(); ++info_it) {
@@ -276,9 +277,9 @@ AgreeLevel FileComparer::comp(char *fn_1, char *fn_2,
         exact_eq = false;
       }
     } else {
-      log_f << class_name_str_2 << " in file 2 with index "
+      log_f << obj_info_2.class_name << " in file 2 with index "
             << obj_info_2.obj_index << " and object name "
-            << obj_info_1.obj_name << " is ignored" << std::endl;
+            << obj_info_2.obj_name << " is ignored" << std::endl;
     }
 
     cur_2 += obj_info_2.nbytes;

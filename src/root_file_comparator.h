@@ -50,8 +50,9 @@ class FileComparer {
    * @param[in] log_fn Name of log file
    * @param[in] ignored_classes set of class names to ignore during comparison
    */
-  AgreeLevel comp(char *f_1, char *f_2, const char *mode,
-                  const char *log_fn,
+  AgreeLevel comp(const std::string &f_1, const std::string &f_2, 
+                  const std::string &mode,
+                  const std::string &log_fn,
                   std::set<std::string> ignored_classes) const;
 
  private:

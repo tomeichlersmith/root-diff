@@ -2,7 +2,7 @@
 
 namespace rootdiff {
 
-static unsigned char *buffer_uncomprs(const ObjectInfo &obj_info, TFile *f) {
+static unsigned char *buffer_uncomprs(const ObjectInfo &obj_info, TFile &f) {
   int obj_len = obj_info.obj_len, key_len = obj_info.key_len,
       nsize = obj_info.nbytes, comprs_len = nsize - key_len;
 
@@ -12,15 +12,15 @@ static unsigned char *buffer_uncomprs(const ObjectInfo &obj_info, TFile *f) {
 
   char *buf = new char[comprs_len];
 
-  f->Seek(offset);
-  f->ReadBuffer(buf, comprs_len);
+  f.Seek(offset);
+  f.ReadBuffer(buf, comprs_len);
 
   if (obj_len > comprs_len) {
     // Object is compressed
     uncomprs_buf = new unsigned char[obj_len];
     int nin, nout = 0, noutot = 0, nbuf;
 
-    while (1) {
+    while (true) {
       // Get information of compressed buffer
       R__unzip_header(&nin, (unsigned char *)buf, &nbuf);
       // Uncompress the buffer
@@ -85,7 +85,7 @@ bool ObjectComparer::exact_cmp(const ObjectInfo &obj_info_1, const ObjectInfo &o
   return true;
 }
 
-bool ObjectComparer::compressed_cmp(const ObjectInfo &obj_info_1, TFile *f_1, const ObjectInfo &obj_info_2, TFile *f_2) const {
+bool ObjectComparer::compressed_cmp(const ObjectInfo &obj_info_1, TFile &f_1, const ObjectInfo &obj_info_2, TFile &f_2) const {
   if (debug_) {
     std::cout << 
         "Compare the compressed buffer of '"
@@ -106,11 +106,11 @@ bool ObjectComparer::compressed_cmp(const ObjectInfo &obj_info_1, TFile *f_1, co
 
   char *buf_1 = new char[cmprs_len_1], *buf_2 = new char[cmprs_len_2];
 
-  f_1->Seek(offset_1);
-  f_1->ReadBuffer(buf_1, cmprs_len_1);
+  f_1.Seek(offset_1);
+  f_1.ReadBuffer(buf_1, cmprs_len_1);
 
-  f_2->Seek(offset_2);
-  f_2->ReadBuffer(buf_2, cmprs_len_2);
+  f_2.Seek(offset_2);
+  f_2.ReadBuffer(buf_2, cmprs_len_2);
 
   int rc = memcmp((unsigned char *)buf_1, (unsigned char *)buf_2, cmprs_len_1);
 
@@ -120,7 +120,7 @@ bool ObjectComparer::compressed_cmp(const ObjectInfo &obj_info_1, TFile *f_1, co
   return (rc == 0 ? true : false);
 }
 
-bool ObjectComparer::uncompressed_cmp(const ObjectInfo &obj_info_1, TFile *f1, const ObjectInfo &obj_info_2, TFile *f2) const {
+bool ObjectComparer::uncompressed_cmp(const ObjectInfo &obj_info_1, TFile &f1, const ObjectInfo &obj_info_2, TFile &f2) const {
   if (debug_) {
     std::cout << 
         "Compare the uncompressed buffer of '"

@@ -51,7 +51,7 @@ class ObjectComparer {
     debug_(debug), compare_compressed_(comp_compressed) {}
   bool logic_cmp(const ObjectInfo &obj_info_1, const ObjectInfo &obj_info_2) const;
   bool exact_cmp(const ObjectInfo &obj_info_1, const ObjectInfo &obj_info_2) const;
-  bool strict_cmp(const ObjectInfo &obj_info_1, TFile *f1, const ObjectInfo &obj_info_2, TFile *f2) const {
+  bool strict_cmp(const ObjectInfo &obj_info_1, TFile &f1, const ObjectInfo &obj_info_2, TFile &f2) const {
     // Since TDirectoryFile class has fUUID attribute,
     // we could not compare two TDirectoryFile objects
     if (obj_info_1.class_name == ROOT_DIR or obj_info_2.class_name == ROOT_DIR) return true;
@@ -60,8 +60,8 @@ class ObjectComparer {
     else                     { return uncompressed_cmp(obj_info_1,f1,obj_info_2,f2); }
   }
  private:
-  bool compressed_cmp(const ObjectInfo &obj_info_1, TFile *f1, const ObjectInfo &obj_info_2, TFile *f2) const;
-  bool uncompressed_cmp(const ObjectInfo &obj_info_1, TFile *f1, const ObjectInfo &obj_info_2, TFile *f2) const;
+  bool compressed_cmp(const ObjectInfo &obj_info_1, TFile &f1, const ObjectInfo &obj_info_2, TFile &f2) const;
+  bool uncompressed_cmp(const ObjectInfo &obj_info_1, TFile &f1, const ObjectInfo &obj_info_2, TFile &f2) const;
  private:
   bool compare_compressed_;
   bool debug_;
