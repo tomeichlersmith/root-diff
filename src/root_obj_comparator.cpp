@@ -1,19 +1,12 @@
 #include "root_obj_comparator.h"
 
-#define ROOT_DIR "TDirectoryFile"
-
-/*
-
-header = header_array; * Uncompress the object buffer exclude the key buffer
- */
-
 namespace rootdiff {
 
-static unsigned char *buffer_uncomprs(Obj_info *obj_info, TFile *f) {
-  int obj_len = obj_info->obj_len, key_len = obj_info->key_len,
-      nsize = obj_info->nbytes, comprs_len = nsize - key_len;
+static unsigned char *buffer_uncomprs(const ObjectInfo &obj_info, TFile *f) {
+  int obj_len = obj_info.obj_len, key_len = obj_info.key_len,
+      nsize = obj_info.nbytes, comprs_len = nsize - key_len;
 
-  long offset = obj_info->seek_key + key_len;
+  long offset = obj_info.seek_key + key_len;
 
   unsigned char *uncomprs_buf;
 
@@ -59,16 +52,16 @@ static unsigned char *buffer_uncomprs(Obj_info *obj_info, TFile *f) {
  * object name, then they are logically equal to each other.
  */
 
-bool ObjectComparer::logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const {
-  if ((obj_info_1->nbytes) != (obj_info_2->nbytes)) {
+bool ObjectComparer::logic_cmp(const ObjectInfo &obj_info_1, const ObjectInfo &obj_info_2) const {
+  if ((obj_info_1.nbytes) != (obj_info_2.nbytes)) {
     return false;
   }
 
-  if (obj_info_1->cycle != obj_info_2->cycle) {
+  if (obj_info_1.cycle != obj_info_2.cycle) {
     return false;
   }
 
-  if (strcmp(obj_info_1->class_name, obj_info_2->class_name) != 0) {
+  if (obj_info_1.class_name != obj_info_2.class_name) {
     return false;
   }
 
@@ -80,46 +73,36 @@ bool ObjectComparer::logic_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const
  * they are exactlly equal if they have same timestamp.
  */
 
-bool ObjectComparer::exact_cmp(Obj_info *obj_info_1, Obj_info *obj_info_2) const {
-  if (obj_info_1->date != obj_info_2->date) {
+bool ObjectComparer::exact_cmp(const ObjectInfo &obj_info_1, const ObjectInfo &obj_info_2) const {
+  if (obj_info_1.date != obj_info_2.date) {
     return false;
   }
 
-  if (obj_info_1->time != obj_info_2->time) {
+  if (obj_info_1.time != obj_info_2.time) {
     return false;
   }
 
   return true;
 }
 
-bool ObjectComparer::compressed_cmp(Obj_info *obj_info_1, TFile *f_1, Obj_info *obj_info_2, TFile *f_2) const {
+bool ObjectComparer::compressed_cmp(const ObjectInfo &obj_info_1, TFile *f_1, const ObjectInfo &obj_info_2, TFile *f_2) const {
   if (debug_) {
     std::cout << 
         "Compare the compressed buffer of '"
-        << obj_info_1->class_name
+        << obj_info_1.class_name
         << "' object in file 1 and '"
-        << obj_info_2->class_name
+        << obj_info_2.class_name
         << "' object in file 2" << std::endl;
   }
 
-  // Since TDirectoryFile class has fUUID attribute,
-  // we could not compare two TDirectoryFile objects
+  int nsize_1 = obj_info_1.nbytes, nsize_2 = obj_info_2.nbytes;
 
-  if (!strcmp(obj_info_1->class_name, ROOT_DIR)) {
-    return true;
-  }
-  if (!strcmp(obj_info_2->class_name, ROOT_DIR)) {
-    return true;
-  }
-
-  int nsize_1 = obj_info_1->nbytes, nsize_2 = obj_info_2->nbytes;
-
-  int k_len_1 = obj_info_1->key_len, k_len_2 = obj_info_2->key_len;
+  int k_len_1 = obj_info_1.key_len, k_len_2 = obj_info_2.key_len;
 
   int cmprs_len_1 = nsize_1 - k_len_1, cmprs_len_2 = nsize_2 - k_len_2;
 
-  long offset_1 = obj_info_1->seek_key + k_len_1,
-       offset_2 = obj_info_2->seek_key + k_len_2;
+  long offset_1 = obj_info_1.seek_key + k_len_1,
+       offset_2 = obj_info_2.seek_key + k_len_2;
 
   char *buf_1 = new char[cmprs_len_1], *buf_2 = new char[cmprs_len_2];
 
@@ -137,21 +120,14 @@ bool ObjectComparer::compressed_cmp(Obj_info *obj_info_1, TFile *f_1, Obj_info *
   return (rc == 0 ? true : false);
 }
 
-bool ObjectComparer::uncompressed_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info *obj_info_2, TFile *f2) const {
+bool ObjectComparer::uncompressed_cmp(const ObjectInfo &obj_info_1, TFile *f1, const ObjectInfo &obj_info_2, TFile *f2) const {
   if (debug_) {
     std::cout << 
         "Compare the uncompressed buffer of '"
-        << obj_info_1->class_name
+        << obj_info_1.class_name
         << "' object in file 1 and '"
-        << obj_info_2->class_name
+        << obj_info_2.class_name
         << "' object in file 2" << std::endl;
-  }
-
-  if (strcmp(obj_info_1->class_name, ROOT_DIR) == 0) {
-    return true;
-  }
-  if (strcmp(obj_info_2->class_name, ROOT_DIR) == 0) {
-    return true;
   }
 
   if (debug_) { std::cout << "unzip the buffer" << std::endl; }
@@ -160,7 +136,7 @@ bool ObjectComparer::uncompressed_cmp(Obj_info *obj_info_1, TFile *f1, Obj_info 
   if (debug_) { std::cout << "unzip the buffer" << std::endl; }
   unsigned char *uncomprs_buf_2 = buffer_uncomprs(obj_info_2, f2);
 
-  int obj_len = obj_info_1->obj_len;
+  int obj_len = obj_info_1.obj_len;
 
   int rc = memcmp(uncomprs_buf_1, uncomprs_buf_2, obj_len);
 
